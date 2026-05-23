@@ -5,7 +5,8 @@ EfficientNet-B0 5-class classifier with 4-view TTA), plus a single-file
 HTML frontend that drops into a WordPress page.
 
 See [`app_instructions.md`](app_instructions.md) for the full build brief
-and pipeline contract.
+and pipeline contract. See [`MODEL_SUMMARY.md`](MODEL_SUMMARY.md) for the
+architecture, what the weights are, and the accuracy numbers.
 
 ---
 
