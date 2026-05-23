@@ -85,9 +85,7 @@ detector fire on?** Sourced from the Phase 2 evaluation runs
 (`Experimenting/classifier_experiments/results/phase2_b0_aug_tta/fold_*/summary.json`).
 
 Fold 0 is excluded from this table — it used a globally less
-aggressive detector and is not comparable at the same operating point
-(per [`CLAUDE.md`](https://github.com/IshuIsAwake/opmd_detection)
-protocol). It still ships as the dev-panel's "Conservative" option.
+aggressive detector and is not comparable at the same operating point. It still ships as the dev-panel's "Conservative" option.
 
 | fold | positives detected | catch rate | negatives flagged | false-alarm rate |
 |---|---|---|---|---|
