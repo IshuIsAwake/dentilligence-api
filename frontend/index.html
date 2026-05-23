@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OPMD Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* =====================================================
+     OPMD Detection — single-file demo (HTML/CSS/JS only)
+     Designed to drop into a Wordpress page as one file.
+     ===================================================== */
+
+  :root {
+    /* palette — light, cool, brand blue + yellow CTA accent */
+    --bg:        #eef4f5;
+    --bg-2:      #f6fafb;
+    --ink:       #0d1b2a;
+    --ink-soft:  #3b4a5a;
+    --ink-mute:  #7a8794;
+    --line:      #d6e2e4;
+    --line-soft: #e6eef0;
+    --brand:     #2f7be3;
+    --brand-ink: #1f4f97;
+    --brand-tint:#e5efff;
+    --yellow:    #fcd34d;
+    --yellow-soft:#fef3c7;
+    --yellow-ink:#7c5c00;
+    --danger:    #d64545;
+    --danger-tint:#fde7e7;
+    --warn:      #d98f1d;
+    --warn-tint: #fbeed1;
+    --ok:        #2f9e6a;
+    --ok-tint:   #e3f4eb;
+    --font-sans: 'Manrope', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  button, input, select { font-family: inherit; }
+
+  /* ---------- Stage (centers the phone) ---------- */
+  .stage {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 24px;
+  }
+
+  /* ---------- Phone frame ---------- */
+  .device {
+    height: min(960px, 94vh);
+    aspect-ratio: 9 / 19;
+    background: #0d1b2a;
+    border-radius: 52px;
+    padding: 15px 13px;
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 40px 90px -30px rgba(13,27,42,0.35),
+      0 14px 30px -10px rgba(13,27,42,0.18);
+    flex-shrink: 0;
+  }
+  .notch {
+    position: absolute; top: 13px; left: 50%;
+    transform: translateX(-50%);
+    width: 92px; height: 22px;
+    background: #0d1b2a;
+    border-radius: 999px;
+    z-index: 5;
+  }
+  .screen {
+    position: relative;
+    width: 100%; height: 100%;
+    background: var(--bg-2);
+    border-radius: 32px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+
+  /* status + app header */
+  .status-bar {
+    flex-shrink: 0;
+    height: 32px; padding: 8px 22px 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 600; color: var(--ink);
+  }
+  .status-icons { display: flex; align-items: center; gap: 5px; }
+
+  .app-header {
+    flex-shrink: 0;
+    padding: 4px 16px 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--brand); color: #fff;
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 13px; letter-spacing: 0.3px;
+  }
+  .brand { font-weight: 800; font-size: 14px; letter-spacing: -0.2px; line-height: 1.1; }
+  .brand-sub { font-size: 10.5px; color: var(--ink-mute); font-weight: 500; }
+  .scan-num { margin-left: auto; font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
+
+  /* canvas (the screen content) */
+  .canvas {
+    flex: 1; margin: 4px 14px 0;
+    border-radius: 18px;
+    background: var(--bg);
+    border: 1px dashed var(--line);
+    position: relative; overflow: hidden;
+  }
+  .canvas.has-image { border-style: solid; border-color: var(--line-soft); }
+
+  /* idle drop zone */
+  .idle-zone {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .idle-zone.drag { background: var(--brand-tint); }
+  .idle-icon {
+    width: 78px; height: 78px; border-radius: 24px;
+    background: var(--brand-tint); color: var(--brand-ink);
+    display: grid; place-items: center;
+  }
+  .idle-title { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .idle-sub { font-size: 11.5px; line-height: 1.4; color: var(--ink-mute); margin-top: 4px; }
+  .idle-hint {
+    margin-top: 4px; font-size: 10.5px; color: var(--ink-mute);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .idle-note {
+    margin-top: 14px;
+    font-family: var(--font-sans); font-size: 10.5px; font-weight: 600;
+    color: var(--warn);
+    background: var(--warn-tint);
+    border: 1px solid rgba(217,143,29,0.25);
+    border-radius: 999px;
+    padding: 6px 11px;
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer;
+    transition: background .15s, transform .12s;
+  }
+  .idle-note:hover { background: #f7e3b3; transform: translateY(-1px); }
+
+  /* Info modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(13,27,42,0.42);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 60;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -48%) scale(0.96);
+    width: min(440px, calc(100vw - 32px));
+    max-height: 80vh; overflow: hidden;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 30px 60px -20px rgba(13,27,42,0.4);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    z-index: 70;
+    display: flex; flex-direction: column;
+  }
+  .modal.open {
+    opacity: 1; pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .modal-title { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; }
+  .modal-close {
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; width: 30px; height: 30px;
+    display: grid; place-items: center;
+    cursor: pointer; color: var(--ink-soft);
+  }
+  .modal-close:hover { background: var(--brand-tint); }
+  .modal-body {
+    padding: 16px 20px 20px;
+    overflow-y: auto;
+    font-size: 13px; line-height: 1.55; color: var(--ink-soft);
+  }
+  .modal-body p { margin: 0 0 12px; }
+  .modal-body ul { margin: 0 0 12px; padding-left: 20px; }
+  .modal-body li { margin-bottom: 6px; }
+  .modal-body strong { color: var(--ink); }
+  .modal-tip {
+    background: var(--brand-tint);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--ink);
+    font-size: 12.5px;
+    margin: 0;
+  }
+
+  /* image fills canvas */
+  .canvas-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: none;
+    transition: filter .4s ease;
+  }
+  .canvas-img.visible { display: block; }
+  .canvas-img.processing { filter: saturate(0.9) brightness(0.97); }
+
+  /* light overlay used during detection — very subtle */
+  .light-veil {
+    position: absolute; inset: 0;
+    background: rgba(246,250,251,0.35);
+    backdrop-filter: blur(0.5px);
+    pointer-events: none;
+    opacity: 0; transition: opacity .25s ease;
+  }
+  .light-veil.on { opacity: 1; }
+
+  /* "Running detector" chip — top center, light theme */
+  .run-chip {
+    position: absolute; top: 14px; left: 50%;
+    transform: translateX(-50%) translateY(-6px);
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 13px 7px 9px;
+    display: none;
+    align-items: center; gap: 8px;
+    font-size: 11.5px; font-weight: 700; color: var(--ink);
+    box-shadow: 0 8px 20px -10px rgba(13,27,42,0.18);
+    opacity: 0;
+    transition: opacity .25s ease, transform .25s ease;
+    white-space: nowrap;
+    z-index: 4;
+  }
+  .run-chip.visible {
+    display: inline-flex;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Light scanline — soft blue */
+  .scanline {
+    position: absolute; left: 0; right: 0; top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--brand), transparent);
+    box-shadow: 0 0 12px 1px rgba(47,123,227,0.55);
+    opacity: 0; pointer-events: none;
+    z-index: 3;
+  }
+  .scanline.running {
+    animation: scan 1.7s ease-in-out infinite;
+  }
+  @keyframes scan {
+    0%   { top: 0%;   opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* Bounding boxes */
+  .bbox-svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .bbox-svg .bbox {
+    opacity: 0;
+    transform-origin: center;
+    animation: box-in .35s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  .bbox-svg .bbox.pulse rect.frame {
+    animation: box-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes box-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes box-pulse {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(47,123,227,0.45)); }
+    50%      { filter: drop-shadow(0 0 9px rgba(47,123,227,0.85)); }
+  }
+  .bbox-frame {
+    fill: none;
+    stroke: var(--brand);
+    stroke-width: 0.6;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 5px rgba(47,123,227,0.55));
+  }
+  .bbox-tick { fill: var(--brand); }
+
+  /* Bottom card — appears for classifying + result */
+  .bottom-card {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: #fff;
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+    padding: 14px 16px 16px;
+    box-shadow: 0 -16px 36px -14px rgba(13,27,42,0.22);
+    display: none;
+    flex-direction: column; gap: 9px;
+    z-index: 6;
+    transform: translateY(100%);
+    transition: transform .35s cubic-bezier(.2,.7,.2,1), max-height .35s ease;
+    max-height: 50%;
+    overflow: hidden;
+  }
+  .bottom-card.visible {
+    display: flex;
+    transform: translateY(0);
+  }
+  .bottom-card.classifying { max-height: 30%; }
+  .bottom-card.result      { max-height: 58%; }
+  .bottom-card.no-detection { max-height: 50%; }
+  /* collapsed — only the handle area is visible so the image is unobscured */
+  .bottom-card.collapsed { max-height: 26px; }
+
+  .card-handle-hit {
+    display: flex; justify-content: center; align-items: center;
+    height: 18px; margin: -6px -16px 2px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .card-handle {
+    width: 40px; height: 4px; border-radius: 2px;
+    background: var(--line);
+    transition: background .15s, width .15s;
+  }
+  .card-handle-hit:hover .card-handle { background: var(--ink-mute); width: 52px; }
+
+  /* classifying state inside bottom card */
+  .classifying-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 2px 2px;
+  }
+  .classifying-text {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.1px;
+  }
+  .classifying-sub {
+    font-size: 11.5px; color: var(--ink-mute); margin-top: 2px;
+  }
+
+  /* result state */
+  .sev-chip {
+    display: inline-flex; align-self: flex-start;
+    align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .sev-chip .dot { width: 6px; height: 6px; border-radius: 999px; }
+  .sev-chip.urgent { background: var(--danger-tint); color: var(--danger); }
+  .sev-chip.urgent .dot { background: var(--danger); }
+  .sev-chip.monitor { background: var(--warn-tint); color: var(--warn); }
+  .sev-chip.monitor .dot { background: var(--warn); }
+  .sev-chip.ok { background: var(--ok-tint); color: var(--ok); }
+  .sev-chip.ok .dot { background: var(--ok); }
+
+  .result-headline {
+    font-size: 14.5px; font-weight: 700; color: var(--ink);
+    line-height: 1.3; letter-spacing: -0.2px;
+  }
+  .result-headline .disease-name { color: var(--brand-ink); }
+  .result-definition { font-size: 11.5px; line-height: 1.5; color: var(--ink-soft); }
+  .result-triage {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    padding: 9px 11px;
+    font-size: 11.5px; line-height: 1.45; color: var(--ink);
+  }
+  .result-triage-label {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px;
+    text-transform: uppercase; color: var(--ink-mute);
+    margin-bottom: 4px;
+  }
+
+  .control-strip {
+    flex-shrink: 0;
+    padding: 12px 14px 22px;
+  }
+  .btn-primary {
+    width: 100%; padding: 13px 18px;
+    border-radius: 14px; border: none;
+    background: var(--brand); color: #fff;
+    font-weight: 700; font-size: 15px;
+    cursor: pointer;
+    transition: background .18s, transform .12s, opacity .18s;
+    box-shadow: 0 10px 22px -10px rgba(47,123,227,0.55);
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn-primary:disabled {
+    background: #c8d6da; cursor: not-allowed; box-shadow: none;
+  }
+  .btn-primary.working {
+    background: #f1f6f7; color: var(--ink-mute);
+    box-shadow: none;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 13px;
+    cursor: not-allowed;
+  }
+  .btn-yellow {
+    width: 100%; padding: 13px 18px;
+    border-radius: 14px; border: none;
+    background: var(--yellow); color: var(--yellow-ink);
+    font-weight: 800; font-size: 15px;
+    cursor: pointer;
+    box-shadow: 0 10px 22px -10px rgba(252,211,77,0.7);
+    transition: transform .12s;
+  }
+  .btn-yellow:hover { transform: translateY(-1px); }
+
+  .home-indicator {
+    position: absolute; bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 4px; border-radius: 4px;
+    background: #0d1b2a; opacity: 0.18;
+    pointer-events: none;
+  }
+
+  /* Spinner */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--line);
+    border-top-color: var(--brand);
+    border-radius: 999px;
+    animation: spin .9s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .spinner.lg { width: 18px; height: 18px; border-width: 2.5px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Dev launcher (light theme) ---------- */
+  .dev-launcher {
+    position: fixed; right: 18px; top: 50%;
+    transform: translateY(-50%);
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 14px 11px;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 12px 28px -12px rgba(13,27,42,0.22);
+    display: flex; flex-direction: column;
+    align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.6px; text-transform: uppercase;
+    z-index: 30;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+  }
+  .dev-launcher:hover {
+    transform: translateY(-50%) translateX(-2px);
+    box-shadow: 0 16px 34px -14px rgba(13,27,42,0.3);
+    border-color: var(--brand-tint);
+  }
+  .dev-launcher-label { writing-mode: vertical-rl; transform: rotate(180deg); }
+  .dev-launcher-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: var(--yellow);
+    box-shadow: 0 0 8px rgba(252,211,77,0.7);
+  }
+
+  /* ---------- Dev drawer ---------- */
+  .drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(13,27,42,0.18);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s ease;
+    z-index: 40;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 340px;
+    background: #fff;
+    box-shadow: -30px 0 60px -20px rgba(13,27,42,0.22);
+    transform: translateX(100%);
+    transition: transform .3s cubic-bezier(.2,.7,.2,1);
+    z-index: 50;
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-head {
+    padding: 22px 24px 16px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .drawer-pill {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px;
+    text-transform: uppercase;
+    background: var(--brand-tint); color: var(--brand-ink);
+    padding: 3px 8px; border-radius: 999px;
+    display: inline-block;
+  }
+  .drawer-title { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; margin-top: 6px; }
+  .drawer-sub   { font-size: 11.5px; color: var(--ink-mute); margin-top: 2px; }
+  .drawer-close {
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; width: 30px; height: 30px;
+    display: grid; place-items: center;
+    cursor: pointer; color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+  .drawer-close:hover { background: var(--brand-tint); }
+
+  .drawer-body {
+    flex: 1; overflow-y: auto;
+    padding: 20px 24px 28px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .field-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .field-value {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink);
+  }
+  .field-hint { font-size: 10.5px; color: var(--ink-mute); }
+
+  /* Segmented control */
+  .seg {
+    display: grid; gap: 4px;
+    padding: 3px;
+    background: var(--bg);
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+  }
+  .seg-btn {
+    padding: 8px;
+    border: none; border-radius: 7px;
+    font-size: 12px; font-weight: 600;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    background: transparent; color: var(--ink-mute);
+    transition: all .12s ease;
+  }
+  .seg-btn.active {
+    background: #fff; color: var(--ink);
+    box-shadow: 0 1px 2px rgba(13,27,42,0.06), 0 0 0 1px var(--line);
+  }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+  }
+  .toggle {
+    width: 38px; height: 22px; border-radius: 999px;
+    background: #cdd6d9;
+    position: relative; border: none; cursor: pointer;
+    transition: background .15s ease;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--brand); }
+  .toggle .knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: left .15s ease;
+  }
+  .toggle.on .knob { left: 18px; }
+
+  /* Stepped slider */
+  .slider {
+    appearance: none; -webkit-appearance: none;
+    width: 100%; height: 4px;
+    background: linear-gradient(90deg, var(--brand) var(--p,0%), var(--line) var(--p,0%));
+    border-radius: 999px; outline: none; cursor: pointer;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 999px;
+    background: #fff; border: 2px solid var(--brand);
+    box-shadow: 0 2px 5px rgba(13,27,42,0.18);
+    cursor: pointer;
+  }
+  .slider::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 999px;
+    background: #fff; border: 2px solid var(--brand);
+    box-shadow: 0 2px 5px rgba(13,27,42,0.18);
+    cursor: pointer;
+  }
+  .tick-row {
+    display: flex; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--ink-mute); margin-top: 4px;
+  }
+  .tick-row span.active { color: var(--brand-ink); font-weight: 700; }
+
+  .divider { height: 1px; background: var(--line-soft); }
+
+  .readout {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .readout-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--ink-mute);
+  }
+  .readout-value {
+    font-family: var(--font-mono);
+    font-size: 28px; font-weight: 500;
+    color: var(--ink-mute);
+    letter-spacing: -0.5px; line-height: 1;
+  }
+  .readout-value.filled { color: var(--ink); }
+  .readout-sub { font-size: 10.5px; color: var(--ink-mute); }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="device">
+    <div class="notch"></div>
+    <div class="screen">
+
+      <div class="status-bar">
+        <span>9:41</span>
+        <span class="status-icons">
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor"><path d="M0 8h2v2H0zM4 6h2v4H4zM8 3h2v7H8zM12 0h2v10h-2z"/></svg>
+          <svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="14" height="9" rx="2"/><rect x="2" y="2" width="9" height="6" fill="currentColor"/><rect x="15.5" y="3" width="1.5" height="4" rx="0.5" fill="currentColor"/></svg>
+        </span>
+      </div>
+
+      <div class="app-header">
+        <div class="logo">O</div>
+        <div>
+          <div class="brand">OPMD Detection</div>
+          <div class="brand-sub">Mouth-photo triage</div>
+        </div>
+        <div class="scan-num">Scan #<span id="scan-count">1</span></div>
+      </div>
+
+      <div class="canvas" id="canvas">
+
+        <!-- IDLE -->
+        <div class="idle-zone" id="idle-zone">
+          <div class="idle-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 8.5A2 2 0 0 1 5 6.5h2.5L9 4.5h6l1.5 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5Z"/>
+              <circle cx="12" cy="13" r="3.6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="idle-title">Take or upload a mouth photo</div>
+            <div class="idle-sub">Open wide, get good light,<br/>fill the frame with the inside of your mouth.</div>
+          </div>
+          <div class="idle-hint">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/>
+            </svg>
+            Tap, drop or paste an image
+          </div>
+          <button type="button" class="idle-note" id="idle-note">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+            Note: the model may misfire — click for more info
+          </button>
+          <input type="file" id="file-input" accept="image/*" hidden />
+        </div>
+
+        <!-- IMAGE -->
+        <img class="canvas-img" id="canvas-img" alt="" />
+
+        <!-- LIGHT VEIL during processing -->
+        <div class="light-veil" id="light-veil"></div>
+
+        <!-- SCANLINE -->
+        <div class="scanline" id="scanline"></div>
+
+        <!-- RUNNING DETECTOR CHIP -->
+        <div class="run-chip" id="run-chip">
+          <span class="spinner"></span>
+          <span id="run-chip-text">Running detector</span>
+        </div>
+
+        <!-- BBOXES -->
+        <svg class="bbox-svg" id="bbox-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+
+        <!-- BOTTOM CARD (classifying / result / no-detection) -->
+        <div class="bottom-card" id="bottom-card">
+          <div class="card-handle-hit" id="card-handle-hit" title="Tap to collapse / expand">
+            <div class="card-handle"></div>
+          </div>
+          <div id="card-body"><!-- filled by JS --></div>
+        </div>
+
+      </div>
+
+      <div class="control-strip">
+        <button class="btn-primary" id="scan-btn" disabled>Scan</button>
+      </div>
+
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Dev launcher -->
+<button class="dev-launcher" id="dev-launcher" aria-label="Open dev settings">
+  <span class="dev-launcher-dot"></span>
+  <span class="dev-launcher-label">Dev settings</span>
+</button>
+
+<!-- Misfire-info modal -->
+<div class="modal-backdrop" id="info-backdrop"></div>
+<div class="modal" id="info-modal" role="dialog" aria-modal="true" aria-labelledby="info-title">
+  <div class="modal-head">
+    <div id="info-title" class="modal-title">When the model can misfire</div>
+    <button class="modal-close" id="info-close" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body">
+    <p>The detector was trained on close-up photos of the oral cavity. It can occasionally flag other things that are visually similar to a lesion. Common false-positive sources:</p>
+    <ul>
+      <li><strong>Teeth</strong> — bright reflections, gaps, or dark crevices can look like patches.</li>
+      <li><strong>Fingers or lips</strong> intruding into the frame.</li>
+      <li><strong>Dental equipment</strong> — mirrors, retractors, cotton rolls, suction tips.</li>
+      <li><strong>Food debris, lipstick, dyes</strong> on the lips or tongue.</li>
+      <li><strong>Glare from camera flash</strong> directly on wet tissue.</li>
+    </ul>
+    <p class="modal-tip"><strong>For best results:</strong> open wide, get even light, fill the frame with the inside of your mouth, and crop the photo to the soft tissue area before uploading if teeth or equipment dominate the frame.</p>
+  </div>
+</div>
+
+<!-- Backdrop + Drawer -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <span class="drawer-pill">Dev</span>
+      <div class="drawer-title">Inference settings</div>
+      <div class="drawer-sub">Internal — not shown to users</div>
+    </div>
+    <button class="drawer-close" id="drawer-close" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+
+    <!-- Detector model -->
+    <div class="field">
+      <div class="field-row">
+        <span class="field-label">Detector model</span>
+        <span class="field-value" id="val-model">m2</span>
+      </div>
+      <div class="seg" id="seg-model" style="grid-template-columns: repeat(4,1fr);">
+        <button class="seg-btn" data-val="0">0</button>
+        <button class="seg-btn active" data-val="2">2</button>
+        <button class="seg-btn" data-val="3">3</button>
+        <button class="seg-btn" data-val="4">4</button>
+      </div>
+      <div class="field-hint" id="hint-model">Default</div>
+    </div>
+
+    <!-- Detector confidence -->
+    <div class="field">
+      <div class="field-row">
+        <span class="field-label">Detector confidence</span>
+        <span class="field-value" id="val-conf">0.10</span>
+      </div>
+      <input type="range" class="slider" id="slider-conf" min="0" max="6" step="1" value="2" />
+      <div class="tick-row" id="ticks-conf">
+        <span>0.01</span><span>0.05</span><span class="active">0.10</span><span>0.15</span><span>0.25</span><span>0.40</span><span>0.50</span>
+      </div>
+    </div>
+
+    <!-- Padding -->
+    <div class="field">
+      <div class="field-row">
+        <span class="field-label">Padding</span>
+        <span class="field-value" id="val-padding">0.2</span>
+      </div>
+      <div class="seg" id="seg-padding" style="grid-template-columns: repeat(3,1fr);">
+        <button class="seg-btn" data-val="0.0">0.0</button>
+        <button class="seg-btn active" data-val="0.2">0.2</button>
+        <button class="seg-btn" data-val="0.4">0.4</button>
+      </div>
+    </div>
+
+    <!-- TTA -->
+    <div class="toggle-row">
+      <div>
+        <div class="field-label">TTA</div>
+        <div class="field-hint">Test-time augmentation</div>
+      </div>
+      <button class="toggle on" id="toggle-tta" aria-pressed="true"><span class="knob"></span></button>
+    </div>
+
+    <!-- Merge boxes -->
+    <div class="toggle-row">
+      <div>
+        <div class="field-label">Merge boxes</div>
+        <div class="field-hint">Combine overlapping detections</div>
+      </div>
+      <button class="toggle" id="toggle-merge" aria-pressed="false"><span class="knob"></span></button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Classifier confidence readout -->
+    <div class="readout">
+      <div class="readout-label">Classifier confidence</div>
+      <div class="readout-value" id="val-classifier-conf">—</div>
+      <div class="readout-sub">Softmax of predicted class. Updates after each scan.</div>
+    </div>
+
+  </div>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+
+  // ====================================================
+  // API base — auto-detected from hostname.
+  // Update the prod URL after Cloud Run deploy.
+  // ====================================================
+  var API_URL = (window.location.hostname === 'localhost'
+                 || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8080'
+    : 'https://<cloud-run-url>';
+
+  // ====================================================
+  // Disease metadata — keyed by server's disease id.
+  // ====================================================
+  var DISEASE_META = {
+    'Leukoplakia': {
+      headline: 'This might be Leukoplakia.',
+      severity: 'monitor',
+      definition: 'White or grey patches on the lining of the mouth that cannot be wiped off. Most are benign, but a small fraction can progress to cancer.',
+      triage: 'Try rubbing the area gently. If the patch wipes away, it is likely harmless. If it persists for more than 2 weeks, please consult a dentist.'
+    },
+    'Erythroplakia': {
+      headline: 'This might be Erythroplakia.',
+      severity: 'urgent',
+      definition: 'Red, velvety patches in the mouth. Less common than leukoplakia but with significantly higher malignant potential.',
+      triage: 'Erythroplakia carries a high risk of progression. Please consult a dentist or oral oncologist as soon as possible — ideally within a week.'
+    },
+    'OSMF': {
+      headline: 'This might be OSMF (Oral Submucous Fibrosis).',
+      severity: 'urgent',
+      definition: 'Stiffening of the oral mucosa, strongly linked to areca-nut, gutka and paan use. Causes a burning sensation and gradually limits mouth opening.',
+      triage: 'Strongly associated with betel-nut and gutka. Stop the habit immediately and book a dentist appointment for staging and management.'
+    },
+    'Lichen_Planus': {
+      headline: 'This might be Lichen Planus.',
+      severity: 'monitor',
+      definition: 'Lacy white striations, sometimes with red or ulcerated areas, most often on the inside of the cheeks. Usually a chronic immune condition.',
+      triage: 'Often benign but requires monitoring as a small percentage of cases can transform. Please book a routine dental consultation for confirmation.'
+    },
+    'NH_Ulcers': {
+      headline: 'This might be a Non-healing Ulcer.',
+      severity: 'urgent',
+      definition: 'A mouth ulcer that has not healed for more than three weeks. Persistent ulcers are one of the most reliable early signs of oral cancer.',
+      triage: 'Any ulcer that has not healed in three weeks needs professional evaluation. Please see a dentist promptly — do not wait.'
+    }
+  };
+
+  // ====================================================
+  // State
+  // ====================================================
+  var state = 'idle';
+  var imageFile = null;
+  var imageNatural = { w: 0, h: 0 };
+  var scanCount = 1;
+  var dev = {
+    detectorModel: 2,
+    detectorConf:  0.10,
+    padding:       0.2,
+    tta:           true,
+    mergeBoxes:    false
+  };
+  var lastClassifierConf = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var idleZone   = $('idle-zone');
+  var fileInput  = $('file-input');
+  var canvasEl   = $('canvas');
+  var canvasImg  = $('canvas-img');
+  var lightVeil  = $('light-veil');
+  var scanline   = $('scanline');
+  var runChip    = $('run-chip');
+  var bboxSvg    = $('bbox-svg');
+  var bottomCard = $('bottom-card');
+  var cardBody   = $('card-body');
+  var scanBtn    = $('scan-btn');
+  var scanCountEl= $('scan-count');
+
+  var devLauncher  = $('dev-launcher');
+  var drawer       = $('drawer');
+  var drawerBackdrop = $('drawer-backdrop');
+  var drawerClose  = $('drawer-close');
+
+  // ====================================================
+  // Upload
+  // ====================================================
+  idleZone.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (f) acceptNewImage(f);
+  });
+
+  // Document-level drag/drop so users can drop on any part of the page
+  // (and from another browser tab — Chrome/FF put the cached image into
+  // dataTransfer.files for cross-tab image drags).
+  document.addEventListener('dragover', function (e) {
+    if (!hasImageData(e.dataTransfer)) return;
+    e.preventDefault();
+    if (state === 'idle') idleZone.classList.add('drag');
+  });
+  document.addEventListener('dragleave', function (e) {
+    if (e.target === document.documentElement) idleZone.classList.remove('drag');
+  });
+  document.addEventListener('drop', function (e) {
+    if (!hasImageData(e.dataTransfer)) return;
+    e.preventDefault();
+    idleZone.classList.remove('drag');
+    var f = pickImageFile(e.dataTransfer);
+    if (f) acceptNewImage(f);
+  });
+
+  // Paste (Ctrl/Cmd-V) — grab the first image item off the clipboard.
+  document.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) {
+        var f = items[i].getAsFile();
+        if (f) { e.preventDefault(); acceptNewImage(f); return; }
+      }
+    }
+  });
+
+  function hasImageData(dt) {
+    if (!dt) return false;
+    if (dt.files && dt.files.length) {
+      for (var i = 0; i < dt.files.length; i++) {
+        if (dt.files[i].type.indexOf('image/') === 0) return true;
+      }
+    }
+    if (dt.types) {
+      for (var j = 0; j < dt.types.length; j++) {
+        if (dt.types[j] === 'Files') return true;
+      }
+    }
+    return false;
+  }
+  function pickImageFile(dt) {
+    if (!dt || !dt.files) return null;
+    for (var i = 0; i < dt.files.length; i++) {
+      if (dt.files[i].type.indexOf('image/') === 0) return dt.files[i];
+    }
+    return null;
+  }
+  function acceptNewImage(file) {
+    // Allow dropping/pasting a new image even after a result — reset first.
+    if (state !== 'idle') softReset();
+    readFile(file);
+  }
+  function softReset() {
+    clearBoxes();
+    imageFile = null;
+    canvasImg.src = '';
+    canvasImg.classList.remove('visible', 'processing');
+    canvasEl.classList.remove('has-image');
+    bottomCard.classList.remove('collapsed');
+    idleZone.style.display = '';
+    state = 'idle';
+  }
+  function readFile(file) {
+    imageFile = file;
+    var r = new FileReader();
+    r.onload = function () { handleUpload(r.result); };
+    r.readAsDataURL(file);
+  }
+  function handleUpload(dataUrl) {
+    canvasImg.onload = function () {
+      imageNatural.w = canvasImg.naturalWidth;
+      imageNatural.h = canvasImg.naturalHeight;
+      // Match SVG viewBox to natural image pixels so server-returned
+      // pixel coords can be plotted directly. preserveAspectRatio with
+      // object-fit:contain on the <img> aligns the two coordinate systems.
+      bboxSvg.setAttribute('viewBox',
+        '0 0 ' + imageNatural.w + ' ' + imageNatural.h);
+      bboxSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    };
+    canvasImg.src = dataUrl;
+    canvasImg.classList.add('visible');
+    canvasEl.classList.add('has-image');
+    idleZone.style.display = 'none';
+    setState('uploaded');
+  }
+
+  // ====================================================
+  // Scan — real API call
+  // ====================================================
+  async function handleScan() {
+    if (state !== 'uploaded' || !imageFile) return;
+    clearBoxes();
+    setState('detecting');
+
+    var fd = new FormData();
+    fd.append('image', imageFile);
+    fd.append('detector_fold', String(dev.detectorModel));
+    fd.append('detector_conf', dev.detectorConf.toFixed(2));
+    fd.append('padding', dev.padding.toFixed(1));
+    fd.append('tta', dev.tta ? 'true' : 'false');
+    fd.append('merge_boxes', dev.mergeBoxes ? 'true' : 'false');
+
+    // Stage 1 visuals run while the request is in flight.
+    // The server does detect + classify in one pass; we briefly show the
+    // classifying state once detection completes so the UI matches the
+    // two-stage mental model.
+    var resp, payload;
+    try {
+      resp = await fetch(API_URL + '/predict', { method: 'POST', body: fd });
+      payload = await resp.json();
+    } catch (err) {
+      showErrorCard('Network error — is the API running at ' + API_URL + '?');
+      return;
+    }
+    if (!resp.ok) {
+      showErrorCard(payload && payload.detail
+        ? String(payload.detail) : ('HTTP ' + resp.status));
+      return;
+    }
+
+    if (!payload.detected) {
+      lastClassifierConf = null;
+      setState('no-detection');
+      return;
+    }
+
+    drawBoxes(payload.boxes);
+    setState('classifying', { payload: payload });
+    // Short pause so the classifying card is perceivable even when
+    // server latency is low (B0 on CPU is ~1s, response feels instant).
+    setTimeout(function () {
+      lastClassifierConf = payload.confidence;
+      setState('result', { payload: payload });
+    }, 450);
+  }
+
+  function handleReset() {
+    clearBoxes();
+    imageFile = null;
+    canvasImg.src = '';
+    canvasImg.classList.remove('visible', 'processing');
+    canvasEl.classList.remove('has-image');
+    idleZone.style.display = '';
+    scanCount++;
+    scanCountEl.textContent = String(scanCount);
+    setState('idle');
+  }
+
+  function setState(next, payload) {
+    state = next;
+    payload = payload || {};
+
+    runChip.classList.remove('visible');
+    scanline.classList.remove('running');
+    lightVeil.classList.remove('on');
+    canvasImg.classList.remove('processing');
+    bottomCard.classList.remove('visible', 'classifying', 'result', 'no-detection', 'collapsed');
+
+    scanBtn.classList.remove('working');
+    scanBtn.disabled = true;
+    scanBtn.textContent = 'Scan';
+
+    if (state === 'uploaded') {
+      scanBtn.disabled = false;
+      scanBtn.onclick = handleScan;
+    }
+    else if (state === 'detecting') {
+      runChip.classList.add('visible');
+      $('run-chip-text').textContent = 'Running detector';
+      scanline.classList.add('running');
+      lightVeil.classList.add('on');
+      canvasImg.classList.add('processing');
+      scanBtn.classList.add('working');
+      scanBtn.innerHTML = '<span class="spinner"></span>Running detector…';
+    }
+    else if (state === 'classifying') {
+      scanBtn.classList.add('working');
+      scanBtn.innerHTML = '<span class="spinner"></span>Classifying lesion…';
+      pulseBoxes(true);
+      showClassifyingCard();
+    }
+    else if (state === 'result') {
+      pulseBoxes(false);
+      showResultCard(payload.payload);
+      scanBtn.style.display = 'none';
+    }
+    else if (state === 'no-detection') {
+      showNoDetectionCard();
+      scanBtn.style.display = 'none';
+    }
+
+    if (state !== 'result' && state !== 'no-detection') {
+      scanBtn.style.display = '';
+    }
+
+    updateDevReadout();
+  }
+
+  // ====================================================
+  // Bounding boxes — server returns pixel coords in the
+  // original image; SVG viewBox is set to the natural image
+  // dimensions, so we plot xyxy directly.
+  // ====================================================
+  function clearBoxes() { bboxSvg.innerHTML = ''; }
+
+  function drawBoxes(boxes) {
+    clearBoxes();
+    var W = imageNatural.w || 1;
+    // Stroke width as a fraction of image width so it stays visible
+    // regardless of the source resolution.
+    var sw = Math.max(2, W * 0.004);
+    var tick = Math.max(3, W * 0.006);
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      var x = b.x1, y = b.y1, w = b.x2 - b.x1, h = b.y2 - b.y1;
+      var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'bbox');
+      g.style.animationDelay = (i * 0.08) + 's';
+
+      var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', w); rect.setAttribute('height', h);
+      rect.setAttribute('class', 'bbox-frame frame');
+      rect.setAttribute('stroke-width', sw);
+      g.appendChild(rect);
+
+      var corners = [[0,0],[1,0],[0,1],[1,1]];
+      for (var j = 0; j < 4; j++) {
+        var cx = corners[j][0], cy = corners[j][1];
+        var t = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        t.setAttribute('x', x + cx*w - tick/2);
+        t.setAttribute('y', y + cy*h - tick/2);
+        t.setAttribute('width', tick);
+        t.setAttribute('height', tick);
+        t.setAttribute('class', 'bbox-tick');
+        g.appendChild(t);
+      }
+      bboxSvg.appendChild(g);
+    }
+  }
+  function pulseBoxes(on) {
+    var groups = bboxSvg.querySelectorAll('.bbox');
+    for (var i = 0; i < groups.length; i++) {
+      groups[i].classList.toggle('pulse', !!on);
+    }
+  }
+
+  // ====================================================
+  // Bottom card content
+  // ====================================================
+  function showClassifyingCard() {
+    cardBody.innerHTML =
+      '<div class="classifying-row">' +
+        '<span class="spinner lg"></span>' +
+        '<div>' +
+          '<div class="classifying-text">Classifying lesion…</div>' +
+          '<div class="classifying-sub">Identifying which OPMD this may be.</div>' +
+        '</div>' +
+      '</div>';
+    bottomCard.classList.add('visible', 'classifying');
+  }
+
+  function showResultCard(payload) {
+    var meta = DISEASE_META[payload.disease] || {
+      headline: 'This might be ' + (payload.disease_display || payload.disease) + '.',
+      severity: 'monitor',
+      definition: '',
+      triage: 'Please consult a dentist for confirmation.'
+    };
+    var sevClass = meta.severity === 'urgent' ? 'urgent' : 'monitor';
+    var sevLabel = meta.severity === 'urgent' ? 'See a dentist soon' : 'Consult a dentist';
+    cardBody.innerHTML =
+      '<div class="sev-chip ' + sevClass + '"><span class="dot"></span>' + sevLabel + '</div>' +
+      '<div class="result-headline">' + escapeHTML(meta.headline) + '</div>' +
+      '<div class="result-definition">' + escapeHTML(meta.definition) + '</div>' +
+      '<div class="result-triage">' +
+        '<div class="result-triage-label">What to do</div>' +
+        escapeHTML(meta.triage) +
+      '</div>' +
+      '<button class="btn-yellow" id="rescan-btn">Scan another</button>';
+    bottomCard.classList.add('visible', 'result');
+    $('rescan-btn').addEventListener('click', handleReset);
+  }
+
+  function showNoDetectionCard() {
+    cardBody.innerHTML =
+      '<div class="sev-chip ok"><span class="dot"></span>Looks fine</div>' +
+      '<div class="result-headline">No lesion detected.</div>' +
+      '<div class="result-definition">' +
+        'Our model could not find a potentially malignant region in this image. ' +
+        'Re-scan every few months, or sooner if you notice a new patch, ulcer or ' +
+        'change in mouth opening.' +
+      '</div>' +
+      '<button class="btn-yellow" id="rescan-btn">Scan another</button>';
+    bottomCard.classList.add('visible', 'no-detection');
+    $('rescan-btn').addEventListener('click', handleReset);
+  }
+
+  function showErrorCard(msg) {
+    state = 'uploaded';
+    runChip.classList.remove('visible');
+    scanline.classList.remove('running');
+    lightVeil.classList.remove('on');
+    canvasImg.classList.remove('processing');
+    cardBody.innerHTML =
+      '<div class="sev-chip urgent"><span class="dot"></span>Error</div>' +
+      '<div class="result-headline">Could not run inference.</div>' +
+      '<div class="result-definition">' + escapeHTML(msg) + '</div>' +
+      '<button class="btn-yellow" id="rescan-btn">Try again</button>';
+    bottomCard.classList.add('visible', 'result');
+    $('rescan-btn').addEventListener('click', handleReset);
+    scanBtn.classList.remove('working');
+    scanBtn.disabled = false;
+    scanBtn.textContent = 'Scan';
+    scanBtn.onclick = handleScan;
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  // ====================================================
+  // Dev drawer
+  // ====================================================
+  function openDrawer() {
+    drawer.classList.add('open');
+    drawerBackdrop.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    drawerBackdrop.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+  devLauncher.addEventListener('click', openDrawer);
+  drawerClose.addEventListener('click', closeDrawer);
+  drawerBackdrop.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDrawer();
+  });
+
+  var segModel = $('seg-model');
+  var modelHints = { 0:'Conservative', 2:'Default', 3:'Alternative', 4:'Aggressive' };
+  segModel.addEventListener('click', function (e) {
+    var btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    var v = parseInt(btn.dataset.val, 10);
+    dev.detectorModel = v;
+    segModel.querySelectorAll('.seg-btn').forEach(function (b) {
+      b.classList.toggle('active', parseInt(b.dataset.val, 10) === v);
+    });
+    $('val-model').textContent = 'm' + v;
+    $('hint-model').textContent = modelHints[v];
+  });
+
+  var CONF_STEPS = [0.01, 0.05, 0.10, 0.15, 0.25, 0.40, 0.50];
+  var sliderConf = $('slider-conf');
+  function updateConfUI() {
+    var idx = parseInt(sliderConf.value, 10);
+    var v = CONF_STEPS[idx];
+    dev.detectorConf = v;
+    $('val-conf').textContent = v.toFixed(2);
+    var pct = (idx / (CONF_STEPS.length - 1)) * 100;
+    sliderConf.style.setProperty('--p', pct + '%');
+    var ticks = $('ticks-conf').children;
+    for (var i = 0; i < ticks.length; i++) {
+      ticks[i].classList.toggle('active', i === idx);
+    }
+  }
+  sliderConf.addEventListener('input', updateConfUI);
+  updateConfUI();
+
+  var segPadding = $('seg-padding');
+  segPadding.addEventListener('click', function (e) {
+    var btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    var v = parseFloat(btn.dataset.val);
+    dev.padding = v;
+    segPadding.querySelectorAll('.seg-btn').forEach(function (b) {
+      b.classList.toggle('active', parseFloat(b.dataset.val) === v);
+    });
+    $('val-padding').textContent = v.toFixed(1);
+  });
+
+  function bindToggle(el, key) {
+    el.addEventListener('click', function () {
+      dev[key] = !dev[key];
+      el.classList.toggle('on', dev[key]);
+      el.setAttribute('aria-pressed', dev[key] ? 'true' : 'false');
+    });
+  }
+  bindToggle($('toggle-tta'), 'tta');
+  bindToggle($('toggle-merge'), 'mergeBoxes');
+
+  // Card collapse — tap the handle to peek the image, tap again to expand.
+  $('card-handle-hit').addEventListener('click', function () {
+    bottomCard.classList.toggle('collapsed');
+  });
+
+  // Misfire-info modal
+  var infoModal    = $('info-modal');
+  var infoBackdrop = $('info-backdrop');
+  function openInfo()  { infoModal.classList.add('open'); infoBackdrop.classList.add('open'); }
+  function closeInfo() { infoModal.classList.remove('open'); infoBackdrop.classList.remove('open'); }
+  $('idle-note').addEventListener('click', function (e) {
+    e.stopPropagation();   // don't trigger the idle-zone file picker
+    openInfo();
+  });
+  $('info-close').addEventListener('click', closeInfo);
+  infoBackdrop.addEventListener('click', closeInfo);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeInfo();
+  });
+
+  function updateDevReadout() {
+    var el = $('val-classifier-conf');
+    if (lastClassifierConf != null) {
+      el.textContent = lastClassifierConf.toFixed(2);
+      el.classList.add('filled');
+    } else {
+      el.textContent = '—';
+      el.classList.remove('filled');
+    }
+  }
+
+  setState('idle');
+})();
+</script>
+
+</body>
+</html>
