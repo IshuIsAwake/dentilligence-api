@@ -3,25 +3,27 @@ import torch.nn as nn
 import torchvision.models as models
 
 
+DROPOUT = 0.1
+
+
 class Classifier(nn.Module):
+    # Mirror of models.EfficientNetB0Classifier so the trained state_dict
+    # produces identical logits when run through ONNX.
     def __init__(self, num_classes=5):
         super().__init__()
-        backbone = models.efficientnet_b0(weights=None)
-        self.backbone = nn.Module()
-        self.backbone.features = backbone.features
-        self.pool = nn.AdaptiveAvgPool2d(1)
+        net = models.efficientnet_b0(weights=None)
+        net.classifier = nn.Identity()
+        self.backbone = net
         self.head = nn.Sequential(
-            nn.Dropout(0.3),
+            nn.Dropout(DROPOUT),
             nn.Linear(1280, 256),
-            nn.SiLU(),
-            nn.Dropout(0.3),
+            nn.GELU(),
+            nn.Dropout(DROPOUT),
             nn.Linear(256, num_classes),
         )
 
     def forward(self, x):
-        x = self.backbone.features(x)
-        x = self.pool(x).flatten(1)
-        return self.head(x)
+        return self.head(self.backbone(x))
 
 
 model = Classifier(num_classes=5)
